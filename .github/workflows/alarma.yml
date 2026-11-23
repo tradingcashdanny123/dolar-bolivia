@@ -1,0 +1,46 @@
+name: Alarma dolar y euro
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'normal = revision de siempre, ver = solo mostrar precios, test = mandar aviso de prueba'
+        type: choice
+        default: normal
+        options:
+          - normal
+          - ver
+          - test
+concurrency:
+  group: alarma
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Recuperar la memoria de la alarma
+        uses: actions/cache/restore@v4
+        with:
+          path: estado.json
+          key: estado-${{ github.run_id }}
+          restore-keys: estado-
+      - name: Revisar precios
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          MODO: ${{ inputs.modo }}
+        run: |
+          if [ "$MODO" = "ver" ]; then python3 alarma_gh.py --ver
+          elif [ "$MODO" = "test" ]; then python3 alarma_gh.py --test
+          else python3 alarma_gh.py
+          fi
+      - name: Guardar la memoria de la alarma
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: estado.json
+          key: estado-${{ github.run_id }}
